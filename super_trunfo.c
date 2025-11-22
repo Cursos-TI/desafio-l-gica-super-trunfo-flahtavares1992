@@ -1,80 +1,107 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-// Definição da capacidade máxima da mochila (lista estática)
-#define MAX_ITENS 10
+// Definimos a capacidade máxima da fila de peças futuras (Array Circular)
+#define MAX_FILA 5 
 
-// 1. Criação da struct Item 
-// Estrutura de dados heterogênea para representar um item no inventário.
+// Variável global para rastrear o ID único de cada peça gerada
+int ID_GLOBAL = 0; 
+
+// --- ESTRUTURAS DE DADOS ---
+
+// 1. Struct do Elemento: A Peça
+// Contém o tipo (nome) e o ID (identificador único) [cite: 3239, 3240, 3241]
 typedef struct {
-    char nome[30];      // Ex: Arma, Munição, Kit Médico
-    char tipo[20];      // Ex: Fuzil, Granada, Cura
-    int quantidade;     // Número de unidades do item
-} Item;
+    char nome;  // Caractere que representa o tipo da peça ('I', 'O', 'T', 'L', etc.)
+    int id;     // Número inteiro único (-1 é usado para indicar falha/vazio)
+} Peca;
 
-// Variável global (ou ponteiro passado) para rastrear quantos itens estão na mochila.
-int contador = 0;
+// 2. Struct da Fila (Circular)
+// Contém o array de peças e os ponteiros de controle da Fila Circular.
+typedef struct {
+    Peca itens[MAX_FILA]; // Array que armazena os elementos
+    int inicio;           // Índice de onde o elemento será retirado (dequeue)
+    int fim;              // Índice de onde o novo elemento será inserido (enqueue)
+    int total;            // Contador de elementos na fila (essencial para checar cheio/vazio em filas circulares)
+} Fila;
 
-// --- PROTÓTIPOS DAS FUNÇÕES OBRIGATÓRIAS [cite: 537] ---
-void inserirItem(Item mochila[], int *contador);
-void removerItem(Item mochila[], int *contador);
-void listarItens(Item mochila[], int contador);
-int buscarItem(Item mochila[], int contador, const char *nomeBusca);
+
+// --- PROTÓTIPOS DAS FUNÇÕES (MODULARIZAÇÃO) ---
+void inicializarFila(Fila *f);
+int filaCheia(Fila *f);
+int filaVazia(Fila *f);
+
+// Funções de Operação (Core FIFO)
+void inserirPeca(Fila *f, Peca p);
+Peca removerPeca(Fila *f);
+void exibirFila(Fila *f);
+
+// Funções Auxiliares
+Peca gerarPeca();
 
 
 // =================================================================
 // MAIN FUNCTION - FLUXO DE EXECUÇÃO
 // =================================================================
 int main() {
-    // 2. Criação do vetor de structs (Lista Estática) 
-    Item mochila[MAX_ITENS];
+    // Inicializa o gerador de números aleatórios para o tipo de peça
+    srand(time(NULL)); 
+    
+    Fila fila_pecas;
+    inicializarFila(&fila_pecas);
+    
     int opcao;
     
-    printf("--- Sistema de Inventário (Nível Novato) ---\n");
-    printf("Capacidade máxima: %d itens.\n", MAX_ITENS);
+    // Inicializa a fila preenchendo-a até o máximo (5 peças)
+    while (fila_pecas.total < MAX_FILA) {
+        inserirPeca(&fila_pecas, gerarPeca());
+    }
+
+    printf("--- Simulador de Fila de Peças do Tetris Stack (Nível Novato) ---\n");
+    printf("Fila inicializada com %d peças.\n", MAX_FILA);
 
     do {
         printf("\n-----------------------------------------\n");
-        printf("1. Inserir Item\n");
-        printf("2. Remover Item\n");
-        printf("3. Listar Itens\n");
-        printf("4. Buscar Item por Nome\n");
+        exibirFila(&fila_pecas); // Exibe o estado atual da fila [cite: 3237]
+        printf("-----------------------------------------\n");
+        
+        printf("1. Jogar Peça (Dequeue)\n");
+        printf("2. Inserir Nova Peça (Enqueue)\n"); 
         printf("0. Sair\n");
         printf("Escolha uma opção: ");
-        scanf("%d", &opcao);
+        
+        // Proteção contra leitura de caracteres/erros
+        if (scanf("%d", &opcao) != 1) {
+            opcao = -1; 
+            while (getchar() != '\n'); // Limpa buffer
+        }
 
         switch (opcao) {
-            case 1:
-                inserirItem(mochila, &contador);
-                break;
-            case 2:
-                removerItem(mochila, &contador);
-                break;
-            case 3:
-                listarItens(mochila, contador);
-                break;
-            case 4: {
-                char nomeBusca[30];
-                printf("Digite o nome do item a buscar: ");
-                scanf("%s", nomeBusca);
-                
-                int indice = buscarItem(mochila, contador, nomeBusca);
-                if (indice != -1) {
-                    printf("\n[RESULTADO DA BUSCA SEQUENCIAL]\n");
-                    printf("Item encontrado no índice %d (Posição %d):\n", indice, indice + 1);
-                    printf("Nome: %s | Tipo: %s | Qtd: %d\n", 
-                        mochila[indice].nome, mochila[indice].tipo, mochila[indice].quantidade);
-                } else {
-                    printf("Item '%s' não encontrado no inventário.\n", nomeBusca);
+            case 1: {
+                // Jogar uma peça (remoção da frente) [cite: 3235]
+                Peca jogada = removerPeca(&fila_pecas);
+                if (jogada.id != -1) {
+                    printf("-> PEÇA JOGADA: [%c%d]\n", jogada.nome, jogada.id);
+                    
+                    // Requisito: A cada remoção, insere uma nova para manter a fila cheia [cite: 3266]
+                    if (!filaCheia(&fila_pecas)) {
+                         inserirPeca(&fila_pecas, gerarPeca());
+                         printf("-> Nova peça adicionada ao final para manter o fluxo.\n");
+                    }
                 }
                 break;
             }
+            case 2:
+                // Inserir nova peça ao final (apenas para testar o limite) [cite: 3236]
+                inserirPeca(&fila_pecas, gerarPeca());
+                break;
             case 0:
-                printf("Saindo do sistema de inventário. Boa sorte na ilha!\n");
+                printf("Saindo do simulador. Peças restantes na fila: %d\n", fila_pecas.total);
                 break;
             default:
-                printf("Opção inválida.\n");
+                printf("Opção inválida ou erro de entrada.\n");
         }
     } while (opcao != 0);
 
@@ -86,80 +113,94 @@ int main() {
 // IMPLEMENTAÇÕES DAS FUNÇÕES
 // =================================================================
 
-// FUNÇÃO 1: Inserir Item [cite: 497, 504]
-void inserirItem(Item mochila[], int *contador) {
-    if (*contador >= MAX_ITENS) {
-        printf("\nMochila Cheia! Não é possível adicionar mais itens.\n");
-        return;
-    }
-    
-    printf("\n[CADASTRANDO NOVO ITEM]\n");
-    
-    printf("Nome do Item: ");
-    scanf("%s", mochila[*contador].nome);
-    
-    printf("Tipo (arma/cura/ferramenta): ");
-    scanf("%s", mochila[*contador].tipo);
-    
-    printf("Quantidade: ");
-    scanf("%d", &mochila[*contador].quantidade);
-    
-    (*contador)++; // Incrementa o número de itens na mochila
-    printf("Item inserido com sucesso na posição %d.\n", *contador);
+// Inicializa a Fila
+void inicializarFila(Fila *f) {
+    f->inicio = 0;
+    f->fim = 0;
+    f->total = 0; // O início e o fim são configurados para o ponto de partida [cite: 3128, 3129, 3130]
 }
 
-// FUNÇÃO 2: Remover Item [cite: 498, 505]
-void removerItem(Item mochila[], int *contador) {
-    if (*contador == 0) {
-        printf("\nMochila vazia! Nada para remover.\n");
+// Verifica se a Fila está Cheia
+int filaCheia(Fila *f) {
+    // A verificação de fila cheia em arrays usa o contador de elementos total [cite: 3138]
+    return f->total == MAX_FILA;
+}
+
+// Verifica se a Fila está Vazia
+int filaVazia(Fila *f) {
+    // Fila vazia é quando o contador de elementos é zero [cite: 3143]
+    return f->total == 0;
+}
+
+// Gera uma nova peça com ID único e tipo aleatório
+Peca gerarPeca() {
+    // Tipos de peças padrão do Tetris
+    char tipos[] = {'I', 'O', 'T', 'L', 'S', 'Z', 'J'};
+    int num_tipos = sizeof(tipos) / sizeof(tipos[0]);
+    
+    Peca nova;
+    nova.nome = tipos[rand() % num_tipos]; // Sorteia um tipo de peça
+    nova.id = ID_GLOBAL++;                 // Atribui e incrementa o ID global
+    return nova;
+}
+
+// Operação ENQUEUE: Adiciona um elemento ao final da fila
+void inserirPeca(Fila *f, Peca p) {
+    if (filaCheia(f)) {
+        printf("Erro: Fila cheia. Não é possível inserir a peça.\n");
         return;
     }
 
-    char nomeRemover[30];
-    printf("Digite o nome do item a remover: ");
-    scanf("%s", nomeRemover);
+    // Insere a nova peça no índice 'fim'
+    f->itens[f->fim] = p; 
+    
+    // ATUALIZAÇÃO CIRCULAR (Lógica Modular): O novo 'fim' é calculado com o operador módulo (%).
+    // Isso garante o uso cíclico do array, voltando ao índice 0 ao atingir o limite[cite: 2944, 2945].
+    f->fim = (f->fim + 1) % MAX_FILA; 
+    
+    f->total++; // Incrementa o total de elementos [cite: 2996]
+}
 
-    // 1. Busca o item a ser removido (usando busca sequencial)
-    int indiceRemover = buscarItem(mochila, *contador, nomeRemover);
+// Operação DEQUEUE: Remove o elemento da frente da fila
+Peca removerPeca(Fila *f) {
+    Peca vazia = {'X', -1}; // Peça de retorno padrão para indicar falha/vazio
+    
+    if (filaVazia(f)) {
+        printf("Erro: Fila vazia. Nenhuma peça para jogar.\n");
+        return vazia;
+    }
+    
+    // Armazena a peça que está na frente (início) - Respeita a ordem FIFO [cite: 3031]
+    Peca removida = f->itens[f->inicio];
+    
+    // ATUALIZAÇÃO CIRCULAR (Lógica Modular): O novo 'inicio' é calculado com o operador módulo (%).
+    // Isso move o índice 'início' circularmente[cite: 2969, 3033].
+    f->inicio = (f->inicio + 1) % MAX_FILA; 
+    
+    f->total--; // Decrementa o total de elementos [cite: 3035]
+    return removida;
+}
 
-    if (indiceRemover != -1) {
-        // 2. Se encontrado, remove o item [cite: 336]
-        // Desloca todos os elementos seguintes uma posição para trás para "tapar" o espaço [cite: 340]
-        for (int i = indiceRemover; i < *contador - 1; i++) {
-            mochila[i] = mochila[i + 1]; // Move o próximo item para a posição atual
+// Exibe o estado atual da fila (Percorrimento)
+void exibirFila(Fila *f) {
+    printf("Fila de Peças Futuras (%d/%d): ", f->total, MAX_FILA);
+    
+    if (filaVazia(f)) {
+        printf("[VAZIA]\n");
+        return;
+    }
+
+    int i = f->inicio;
+    int count = 0;
+    
+    // Itera do INÍCIO até o FIM, respeitando a ordem FIFO e a lógica circular, usando o 'total' como limite.
+    while (count < f->total) {
+        printf("[%c%d]", f->itens[i].nome, f->itens[i].id);
+        i = (i + 1) % MAX_FILA; // Move para o próximo índice circularmente
+        count++;
+        if (count < f->total) {
+            printf(" ");
         }
-        
-        (*contador)--; // Decrementa o número de itens
-        printf("Item '%s' removido com sucesso.\n", nomeRemover);
-    } else {
-        printf("Item '%s' não encontrado na mochila.\n", nomeRemover);
     }
-}
-
-// FUNÇÃO 3: Listar Itens [cite: 499, 506]
-void listarItens(Item mochila[], int contador) {
-    printf("\n--- INVENTÁRIO ATUAL (Total: %d itens) ---\n", contador);
-    if (contador == 0) {
-        printf("A mochila está vazia.\n");
-        return;
-    }
-
-    for (int i = 0; i < contador; i++) {
-        // Percorrendo o vetor e exibindo os dados [cite: 539]
-        printf("%d. [Nome: %s | Tipo: %s | Qtd: %d]\n", 
-            i + 1, mochila[i].nome, mochila[i].tipo, mochila[i].quantidade);
-    }
-}
-
-// FUNÇÃO 4: Buscar Item (Busca Sequencial/Linear) [cite: 507, 525, 398]
-// Retorna o índice do item ou -1 se não encontrado.
-int buscarItem(Item mochila[], int contador, const char *nomeBusca) {
-    // A busca linear examina, um por um, todos os elementos da estrutura [cite: 399]
-    for (int i = 0; i < contador; i++) {
-        // Compara a string do nome do item com o nome buscado
-        if (strcmp(mochila[i].nome, nomeBusca) == 0) {
-            return i; // Item encontrado
-        }
-    }
-    return -1; // Item não encontrado
+    printf("\n");
 }
